@@ -102,6 +102,15 @@ def login_to_page(url: str, login_id: str, password: str) -> str:
         except:
             pass
 
+        # 給与メニューボタンをクリック
+        try:
+            salary_menu = page.locator('a.btnMain_1:has-text("給与メニュー")')
+            if salary_menu.count() > 0:
+                salary_menu.first.click()
+                page.wait_for_timeout(1000)
+        except:
+            pass
+
         page.screenshot(path=file_name)
 
         browser.close()
