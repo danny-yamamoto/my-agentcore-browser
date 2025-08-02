@@ -190,6 +190,24 @@ def login_to_page(url: str, login_id: str, password: str) -> str:
         except:
             pass
 
+        # 給与明細印刷ボタンをクリック
+        try:
+            salary_print_button = page.locator('a.btnMain_0:has-text("給与明細印刷")')
+            if salary_print_button.count() > 0:
+                salary_print_button.first.click()
+                page.wait_for_timeout(1000)
+        except:
+            pass
+
+        # 全選択/解除ボタンをクリック
+        try:
+            all_select_button = page.locator('input[value="全選択/解除"][onclick="AllChk()"]')
+            if all_select_button.count() > 0:
+                all_select_button.first.click()
+                page.wait_for_timeout(500)
+        except:
+            pass
+
         page.screenshot(path=file_name)
 
         browser.close()
