@@ -111,6 +111,16 @@ def login_to_page(url: str, login_id: str, password: str) -> str:
         except:
             pass
 
+        # 給与明細入力ボタンをクリック
+        try:
+            salary_detail_input = page.locator(
+                'a.btnMain_0:has-text("給与明細入力")')
+            if salary_detail_input.count() > 0:
+                salary_detail_input.first.click()
+                page.wait_for_timeout(1000)
+        except:
+            pass
+
         page.screenshot(path=file_name)
 
         browser.close()
