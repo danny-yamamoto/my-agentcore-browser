@@ -139,6 +139,15 @@ def login_to_page(url: str, login_id: str, password: str) -> str:
         except:
             pass
 
+        # WorkHoursフィールドに時間を入力
+        try:
+            work_hours_field = page.locator('input[name="WorkHours"]')
+            if work_hours_field.count() > 0:
+                work_hours_field.first.fill('240')
+                page.wait_for_timeout(500)
+        except:
+            pass
+
         page.screenshot(path=file_name)
 
         browser.close()
