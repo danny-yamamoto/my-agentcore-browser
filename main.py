@@ -121,6 +121,24 @@ def login_to_page(url: str, login_id: str, password: str) -> str:
         except:
             pass
 
+        # 編集ボタンをクリック
+        try:
+            edit_button = page.locator('input[name="BtnEdit"][value="編集"]')
+            if edit_button.count() > 0:
+                edit_button.first.click()
+                page.wait_for_timeout(1000)
+        except:
+            pass
+
+        # WorkDaysフィールドに30を入力
+        try:
+            work_days_field = page.locator('input[name="WorkDays"]')
+            if work_days_field.count() > 0:
+                work_days_field.first.fill('30')
+                page.wait_for_timeout(500)
+        except:
+            pass
+
         page.screenshot(path=file_name)
 
         browser.close()
