@@ -212,6 +212,10 @@ def login_to_page(url: str, login_id: str, password: str) -> str:
 
         # 印刷ボタンをクリック
         try:
+            # 印刷ボタンクリック前のページ数を記録
+            initial_pages = len(context.pages)
+            print(f"印刷ボタンクリック前のページ数: {initial_pages}")
+            
             print_button = page.locator('input[name="BtnSubmit1"][value="印刷"]')
             if print_button.count() > 0:
                 print_button.first.click()
@@ -219,14 +223,46 @@ def login_to_page(url: str, login_id: str, password: str) -> str:
         except:
             pass
 
-        # 印刷画面のダウンロードボタンをクリック
+        # 新しい印刷ウィンドウに切り替えてダウンロード
         try:
-            download_button = page.locator(
-                'cr-icon-button#download[aria-label="ダウンロード"]')
-            if download_button.count() > 0:
-                download_button.first.click()
-                page.wait_for_timeout(1000)
-        except:
+
+            # 新しいページが開くまで待機
+            page.wait_for_timeout(5000)
+
+            # 新しく開いたページを取得
+            current_pages = context.pages
+            print(f"印刷ボタンクリック後のページ数: {len(current_pages)}")
+
+            if len(current_pages) > initial_pages:
+                new_page = current_pages[-1]  # 最新のページを取得
+                print(f"新しいページURL: {new_page.url}")
+
+                try:
+                    new_page.wait_for_load_state("networkidle", timeout=10000)
+                    new_page.wait_for_timeout(3000)
+                    print("印刷画面のスクリーンショットを撮影中...")
+                    new_page.screenshot(path="print_screen.png")
+                    print("印刷画面のスクリーンショット撮影完了")
+                except Exception as screenshot_error:
+                    print(f"スクリーンショット撮影エラー: {screenshot_error}")
+            else:
+                print("新しいページが検出されませんでした")
+
+                # ダウンロードを開始
+                with new_page.expect_download() as download_info:
+                    download_button = new_page.locator(
+                        'cr-icon-button#download[aria-label="ダウンロード"]')
+                    if download_button.count() > 0:
+                        download_button.first.click()
+
+                # ダウンロードを保存
+                download = download_info.value
+                download.save_as("salary_statement.pdf")
+
+                # 印刷ウィンドウを閉じる
+                new_page.close()
+        except Exception as e:
+            print(f"印刷ウィンドウ処理エラー: {e}")
             pass
 
         page.screenshot(path=file_name)
