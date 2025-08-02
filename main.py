@@ -192,7 +192,8 @@ def login_to_page(url: str, login_id: str, password: str) -> str:
 
         # 給与明細印刷ボタンをクリック
         try:
-            salary_print_button = page.locator('a.btnMain_0:has-text("給与明細印刷")')
+            salary_print_button = page.locator(
+                'a.btnMain_0:has-text("給与明細印刷")')
             if salary_print_button.count() > 0:
                 salary_print_button.first.click()
                 page.wait_for_timeout(1000)
@@ -201,10 +202,20 @@ def login_to_page(url: str, login_id: str, password: str) -> str:
 
         # 全選択/解除ボタンをクリック
         try:
-            all_select_button = page.locator('input[value="全選択/解除"][onclick="AllChk()"]')
+            all_select_button = page.locator(
+                'input[value="全選択/解除"][onclick="AllChk()"]')
             if all_select_button.count() > 0:
                 all_select_button.first.click()
                 page.wait_for_timeout(500)
+        except:
+            pass
+
+        # 印刷ボタンをクリック
+        try:
+            print_button = page.locator('input[name="BtnSubmit1"][value="印刷"]')
+            if print_button.count() > 0:
+                print_button.first.click()
+                page.wait_for_timeout(2000)
         except:
             pass
 
