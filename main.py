@@ -84,6 +84,15 @@ def login_to_page(url: str, login_id: str, password: str) -> str:
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(2000)
 
+        # モーダルを閉じる
+        try:
+            close_button = page.locator('.g-modal-close-tour, .g-modal-close')
+            if close_button.count() > 0:
+                close_button.first.click()
+                page.wait_for_timeout(1000)
+        except:
+            pass
+
         page.screenshot(path=file_name)
 
         browser.close()
