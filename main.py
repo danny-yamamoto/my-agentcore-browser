@@ -219,6 +219,16 @@ def login_to_page(url: str, login_id: str, password: str) -> str:
         except:
             pass
 
+        # 印刷画面のダウンロードボタンをクリック
+        try:
+            download_button = page.locator(
+                'cr-icon-button#download[aria-label="ダウンロード"]')
+            if download_button.count() > 0:
+                download_button.first.click()
+                page.wait_for_timeout(1000)
+        except:
+            pass
+
         page.screenshot(path=file_name)
 
         browser.close()
