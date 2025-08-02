@@ -148,6 +148,48 @@ def login_to_page(url: str, login_id: str, password: str) -> str:
         except:
             pass
 
+        # 再計算ボタンをクリック
+        try:
+            recalc_button = page.locator(
+                'input[name="BtnRunCalcAll"][value="再計算"]')
+            if recalc_button.count() > 0:
+                recalc_button.first.click()
+                page.wait_for_timeout(500)
+        except:
+            pass
+
+        # 確認ダイアログのOKをクリック
+        try:
+            page.on("dialog", lambda dialog: dialog.accept())
+            page.wait_for_timeout(1000)
+        except:
+            pass
+
+        # 登録ボタンをクリック
+        try:
+            submit_button = page.locator('input[name="BtnSubmit"][value="登録"]')
+            if submit_button.count() > 0:
+                submit_button.first.click()
+                page.wait_for_timeout(1000)
+        except:
+            pass
+
+        # 確認ダイアログのOKをクリック
+        try:
+            page.on("dialog", lambda dialog: dialog.accept())
+            page.wait_for_timeout(1000)
+        except:
+            pass
+
+        # 終了ボタンをクリック
+        try:
+            end_button = page.locator('input[value="終了"][onclick*="EndBack"]')
+            if end_button.count() > 0:
+                end_button.first.click()
+                page.wait_for_timeout(1000)
+        except:
+            pass
+
         page.screenshot(path=file_name)
 
         browser.close()
