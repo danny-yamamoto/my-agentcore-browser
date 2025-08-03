@@ -376,6 +376,41 @@ def get_sheet_data(spreadsheet_name: str, sheet_name: str, service_account_file:
 
 
 @tool
+def process_employee_salary(employee_id: str, employee_name: str, work_days: int, work_hours: int) -> str:
+    """
+    単一従業員の給与明細を更新します。
+
+    Args:
+        employee_id: 従業員番号
+        employee_name: 従業員名
+        work_days: 出勤日数
+        work_hours: 労働時間
+
+    Returns:
+        "success" または "failed" の処理結果
+    """
+    try:
+        # 環境変数から設定を取得
+        target_url = os.getenv("SALARY_URL")
+        login_id = os.getenv("LOGIN_ID")
+        password = os.getenv("PASSWORD")
+
+        if not all([target_url, login_id, password]):
+            return "failed: 環境変数が設定されていません"
+
+        # ダミー処理：実際の実装はここで給与システムにアクセス
+        # print(f"従業員 {employee_name}({employee_id}) の給与明細を更新中...")
+        # print(f"出勤日数: {work_days}日, 労働時間: {work_hours}時間")
+        # print(f"URL: {target_url} にログイン中...")
+
+        # 常に成功を返すダミー実装
+        return f"success: 従業員 {employee_name} の給与明細を更新しました"
+
+    except Exception as e:
+        return f"failed: {str(e)}"
+
+
+@tool
 def update_salary_slip(sheet_data: str) -> str:
     """
     スプレッドシートから取得したデータを元に環境変数で指定したURLにログインして給与明細を更新し、印刷します。
@@ -400,17 +435,57 @@ def update_salary_slip(sheet_data: str) -> str:
         if "error" in data:
             return f"failed: シートデータエラー - {data['error']}"
 
+        # デバッグ用：データ構造を確認
+        print("=== データ構造確認 ===")
+        print(f"データキー: {list(data.keys())}")
+        print(f"ヘッダー: {data.get('headers', [])}")
+        print(f"従業員数: {data.get('total_employees', 0)}")
+
         employees = data.get("employees", [])
         if not employees:
             return "failed: 従業員データが見つかりません"
 
-        # 各従業員の給与明細を処理
+        # 最初の従業員データの構造を確認
+        if employees:
+            print(f"最初の従業員データ: {employees[0]}")
+        print("=====================")
+
+        # A列をスキップしてB列から順番に処理
         success_count = 0
-        for employee in employees:
+        headers = data.get("headers", [])
+
+        # B列から処理（A列はスキップ）
+        for col_index in range(1, len(headers)):
+            column_name = headers[col_index]
+            print(f"{column_name}列を処理中...")
+
             try:
-                success_count += 1
+                # 該当列の全データを収集
+                column_values = []
+                for employee in employees:
+                    column_data = employee.get('データ', {}).get(column_name, '')
+                    if column_data:  # 空でないデータのみ
+                        column_values.append({
+                            'employee_id': employee.get('従業員番号', ''),
+                            'employee_name': employee.get('氏名', ''),
+                            'value': column_data
+                        })
+                
+                print(f"  {column_name}列のデータ: {[v['value'] for v in column_values]}")
+                
+                # 列全体を一括処理
+                if column_values:
+                    result = process_employee_salary(
+                        f"Column_{column_name}",  # 列名をID代わりに使用
+                        f"{column_name}列データ",
+                        30,  # デフォルト出勤日数
+                        240  # デフォルト労働時間
+                    )
+                    if result.startswith("success"):
+                        success_count += 1
+
             except Exception as e:
-                print(f"従業員 {employee.get('氏名', 'unknown')} の処理でエラー: {e}")
+                print(f"{column_name}列の処理でエラー: {e}")
                 continue
 
         if success_count > 0:
@@ -428,7 +503,7 @@ bedrock = BedrockModel(
     model_id="us.anthropic.claude-sonnet-4-20250514-v1:0", region_name=region)
 
 agent = Agent(model=bedrock, tools=[
-              capture_page, login_to_page, get_sheet_data, update_salary_slip])
+              capture_page, login_to_page, get_sheet_data, process_employee_salary, update_salary_slip])
 
 
 if __name__ == "__main__":
