@@ -331,34 +331,32 @@ def get_sheet_data(spreadsheet_name: str, sheet_name: str, service_account_file:
         if not values:
             return json.dumps({"error": "データが見つかりませんでした"}, ensure_ascii=False)
 
-        # データを構造化
-        headers = values[0] if values else []
-        employee_data = []
+        # A列が項目名、B列以降が各従業員のデータ
+        if not values or len(values) < 2:
+            return json.dumps({"error": "データが不足しています"}, ensure_ascii=False)
+        
+        # B列以降の列名（従業員9001、従業員8002など）を取得
+        column_headers = values[0][1:]  # A列をスキップしてB列以降
+        column_data = {}
+        
+        # 各列（従業員）のデータを収集
+        for col_index, column_header in enumerate(column_headers):
+            employee_data = {}
+            
+            # 各行の項目とデータを対応付け
+            for row_index in range(1, len(values)):
+                row = values[row_index]
+                if len(row) > 0:
+                    item_name = row[0]  # A列の項目名（従業員番号、氏名、部署名など）
+                    value = row[col_index + 1] if col_index + 1 < len(row) else ""  # 対応するデータ
+                    employee_data[item_name] = value
+            
+            # 列のヘッダー名をキーとして格納
+            column_data[column_header] = employee_data
 
-        for row in values[1:]:  # ヘッダー行をスキップ
-            if len(row) >= 3:  # 最低限の列数チェック
-                employee_info = {
-                    "従業員番号": row[0] if len(row) > 0 else "",
-                    "氏名": row[1] if len(row) > 1 else "",
-                    "部署名": row[2] if len(row) > 2 else "",
-                    "データ": {}
-                }
+        print(json.dumps(column_data, ensure_ascii=False, indent=2))
 
-                # B列以降のデータを追加
-                for i, header in enumerate(headers[3:], start=3):
-                    if i < len(row):
-                        employee_info["データ"][header] = row[i]
-
-                employee_data.append(employee_info)
-
-        result_data = {
-            "sheet_name": sheet_name,
-            "total_employees": len(employee_data),
-            "headers": headers,
-            "employees": employee_data
-        }
-
-        return json.dumps(result_data, ensure_ascii=False, indent=2)
+        return json.dumps(column_data, ensure_ascii=False, indent=2)
 
     except FileNotFoundError:
         return json.dumps({"error": f"サービスアカウントファイル '{service_account_file}' が見つかりません"}, ensure_ascii=False)
@@ -432,66 +430,14 @@ def update_salary_slip(sheet_data: str) -> str:
 
         # JSONデータをパース
         data = json.loads(sheet_data)
+        print("=== デバッグ: 受信したデータ ===")
+        print(json.dumps(data, ensure_ascii=False, indent=2))
+        print("=============================")
+
         if "error" in data:
             return f"failed: シートデータエラー - {data['error']}"
 
-        # デバッグ用：データ構造を確認
-        print("=== データ構造確認 ===")
-        print(f"データキー: {list(data.keys())}")
-        print(f"ヘッダー: {data.get('headers', [])}")
-        print(f"従業員数: {data.get('total_employees', 0)}")
-
-        employees = data.get("employees", [])
-        if not employees:
-            return "failed: 従業員データが見つかりません"
-
-        # 最初の従業員データの構造を確認
-        if employees:
-            print(f"最初の従業員データ: {employees[0]}")
-        print("=====================")
-
-        # A列をスキップしてB列から順番に処理
-        success_count = 0
-        headers = data.get("headers", [])
-
-        # B列から処理（A列はスキップ）
-        for col_index in range(1, len(headers)):
-            column_name = headers[col_index]
-            print(f"{column_name}列を処理中...")
-
-            try:
-                # 該当列の全データを収集
-                column_values = []
-                for employee in employees:
-                    column_data = employee.get('データ', {}).get(column_name, '')
-                    if column_data:  # 空でないデータのみ
-                        column_values.append({
-                            'employee_id': employee.get('従業員番号', ''),
-                            'employee_name': employee.get('氏名', ''),
-                            'value': column_data
-                        })
-                
-                print(f"  {column_name}列のデータ: {[v['value'] for v in column_values]}")
-                
-                # 列全体を一括処理
-                if column_values:
-                    result = process_employee_salary(
-                        f"Column_{column_name}",  # 列名をID代わりに使用
-                        f"{column_name}列データ",
-                        30,  # デフォルト出勤日数
-                        240  # デフォルト労働時間
-                    )
-                    if result.startswith("success"):
-                        success_count += 1
-
-            except Exception as e:
-                print(f"{column_name}列の処理でエラー: {e}")
-                continue
-
-        if success_count > 0:
-            return f"success: {success_count}名の給与明細を処理しました"
-        else:
-            return "failed: 全ての従業員の処理に失敗しました"
+        return f"success: 給与明細を処理しました"
 
     except json.JSONDecodeError:
         return "failed: 無効なJSONデータです"
