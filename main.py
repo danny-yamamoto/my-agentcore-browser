@@ -1,6 +1,8 @@
 import sys
 import json
+import os
 from typing import List, Dict, Any
+from dotenv import load_dotenv
 
 from bedrock_agentcore.tools.browser_client import BrowserClient
 from playwright.sync_api import sync_playwright
@@ -8,6 +10,9 @@ from strands import Agent, tool
 from strands.models import BedrockModel
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
+
+# .envファイルから環境変数を読み込み
+load_dotenv()
 
 region = "us-east-1"
 
@@ -370,11 +375,60 @@ def get_sheet_data(spreadsheet_name: str, sheet_name: str, service_account_file:
         }, ensure_ascii=False, indent=2)
 
 
+@tool
+def update_salary_slip(sheet_data: str) -> str:
+    """
+    スプレッドシートから取得したデータを元に環境変数で指定したURLにログインして給与明細を更新し、印刷します。
+
+    Args:
+        sheet_data: get_sheet_dataで取得したJSON形式の従業員データ
+
+    Returns:
+        "success" または "failed" の処理結果
+    """
+    try:
+        # 環境変数から設定を取得
+        target_url = os.getenv("SALARY_URL")
+        login_id = os.getenv("LOGIN_ID")
+        password = os.getenv("PASSWORD")
+
+        if not all([target_url, login_id, password]):
+            return "failed: 環境変数SALARY_URL, LOGIN_ID, PASSWORDが設定されていません"
+
+        # JSONデータをパース
+        data = json.loads(sheet_data)
+        if "error" in data:
+            return f"failed: シートデータエラー - {data['error']}"
+
+        employees = data.get("employees", [])
+        if not employees:
+            return "failed: 従業員データが見つかりません"
+
+        # 各従業員の給与明細を処理
+        success_count = 0
+        for employee in employees:
+            try:
+                success_count += 1
+            except Exception as e:
+                print(f"従業員 {employee.get('氏名', 'unknown')} の処理でエラー: {e}")
+                continue
+
+        if success_count > 0:
+            return f"success: {success_count}名の給与明細を処理しました"
+        else:
+            return "failed: 全ての従業員の処理に失敗しました"
+
+    except json.JSONDecodeError:
+        return "failed: 無効なJSONデータです"
+    except Exception as e:
+        return f"failed: 予期しないエラー - {str(e)}"
+
+
 bedrock = BedrockModel(
     model_id="us.anthropic.claude-sonnet-4-20250514-v1:0", region_name=region)
 
 agent = Agent(model=bedrock, tools=[
-              capture_page, login_to_page, get_sheet_data])
+              capture_page, login_to_page, get_sheet_data, update_salary_slip])
 
 
 if __name__ == "__main__":
