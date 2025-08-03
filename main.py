@@ -1,9 +1,13 @@
 import sys
+import json
+from typing import List, Dict, Any
 
 from bedrock_agentcore.tools.browser_client import BrowserClient
 from playwright.sync_api import sync_playwright
 from strands import Agent, tool
 from strands.models import BedrockModel
+from googleapiclient.discovery import build
+from google.oauth2 import service_account
 
 region = "us-east-1"
 
@@ -215,7 +219,7 @@ def login_to_page(url: str, login_id: str, password: str) -> str:
             # 印刷ボタンクリック前のページ数を記録
             initial_pages = len(context.pages)
             print(f"印刷ボタンクリック前のページ数: {initial_pages}")
-            
+
             print_button = page.locator('input[name="BtnSubmit1"][value="印刷"]')
             if print_button.count() > 0:
                 print_button.first.click()
@@ -274,10 +278,103 @@ def login_to_page(url: str, login_id: str, password: str) -> str:
     return file_name
 
 
+@tool
+def get_sheet_data(spreadsheet_name: str, sheet_name: str, service_account_file: str = "service_account.json") -> str:
+    """
+    Google Sheetsからデータを取得します。
+    A列に従業員番号、氏名、部署名、B列以降に従業員データが入力されている前提です。
+
+    Args:
+        spreadsheet_name: スプレッドシートの名前またはID
+        sheet_name: 取得するシート名（タブ名）
+        service_account_file: サービスアカウントのJSONファイルパス
+
+    Returns:
+        取得したデータをJSON形式の文字列で返却
+    """
+    try:
+        # サービスアカウント認証
+        credentials = service_account.Credentials.from_service_account_file(
+            service_account_file,
+            scopes=['https://www.googleapis.com/auth/spreadsheets.readonly']
+        )
+
+        # Google Sheets APIクライアント作成
+        service = build('sheets', 'v4', credentials=credentials)
+
+        # spreadsheet_nameがIDか名前かを判定
+        spreadsheet_id = spreadsheet_name
+        if not spreadsheet_name.startswith('1') or len(spreadsheet_name) < 40:
+            # 名前で検索する場合（Drive APIが必要になるため、IDを要求）
+            return json.dumps({
+                "error": "スプレッドシート名での検索は未対応です。スプレッドシートIDを使用してください",
+                "help": {
+                    "spreadsheet_id": "スプレッドシートのURLから /spreadsheets/d/ 以降の文字列をコピーしてください",
+                    "例": "https://docs.google.com/spreadsheets/d/1ABC...XYZ/edit → 1ABC...XYZ の部分"
+                }
+            }, ensure_ascii=False, indent=2)
+
+        # シートからデータを取得
+        range_name = f'{sheet_name}!A:Z'  # A列からZ列まで取得
+        result = service.spreadsheets().values().get(
+            spreadsheetId=spreadsheet_id,
+            range=range_name
+        ).execute()
+
+        values = result.get('values', [])
+
+        if not values:
+            return json.dumps({"error": "データが見つかりませんでした"}, ensure_ascii=False)
+
+        # データを構造化
+        headers = values[0] if values else []
+        employee_data = []
+
+        for row in values[1:]:  # ヘッダー行をスキップ
+            if len(row) >= 3:  # 最低限の列数チェック
+                employee_info = {
+                    "従業員番号": row[0] if len(row) > 0 else "",
+                    "氏名": row[1] if len(row) > 1 else "",
+                    "部署名": row[2] if len(row) > 2 else "",
+                    "データ": {}
+                }
+
+                # B列以降のデータを追加
+                for i, header in enumerate(headers[3:], start=3):
+                    if i < len(row):
+                        employee_info["データ"][header] = row[i]
+
+                employee_data.append(employee_info)
+
+        result_data = {
+            "sheet_name": sheet_name,
+            "total_employees": len(employee_data),
+            "headers": headers,
+            "employees": employee_data
+        }
+
+        return json.dumps(result_data, ensure_ascii=False, indent=2)
+
+    except FileNotFoundError:
+        return json.dumps({"error": f"サービスアカウントファイル '{service_account_file}' が見つかりません"}, ensure_ascii=False)
+    except Exception as e:
+        error_type = type(e).__name__
+        return json.dumps({
+            "error": f"データ取得エラー ({error_type}): {str(e)}",
+            "help": {
+                "使用方法": "python main.py \"[スプレッドシートID]の[シート名]からデータを取得して\"",
+                "spreadsheet_id": "スプレッドシートのURLから /spreadsheets/d/ 以降の文字列",
+                "sheet_name": "スプレッドシート下部のタブ名（例：'Sheet1', 'データ', '従業員一覧'）",
+                "service_account": "Google Cloud Consoleで作成したサービスアカウントのJSONファイルが必要です"
+            }
+        }, ensure_ascii=False, indent=2)
+
+
 bedrock = BedrockModel(
     model_id="us.anthropic.claude-sonnet-4-20250514-v1:0", region_name=region)
 
-agent = Agent(model=bedrock, tools=[capture_page, login_to_page])
+agent = Agent(model=bedrock, tools=[
+              capture_page, login_to_page, get_sheet_data])
 
 
 if __name__ == "__main__":
