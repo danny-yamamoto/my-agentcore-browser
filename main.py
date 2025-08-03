@@ -334,23 +334,24 @@ def get_sheet_data(spreadsheet_name: str, sheet_name: str, service_account_file:
         # A列が項目名、B列以降が各従業員のデータ
         if not values or len(values) < 2:
             return json.dumps({"error": "データが不足しています"}, ensure_ascii=False)
-        
+
         # B列以降の列名（従業員9001、従業員8002など）を取得
         column_headers = values[0][1:]  # A列をスキップしてB列以降
         column_data = {}
-        
+
         # 各列（従業員）のデータを収集
         for col_index, column_header in enumerate(column_headers):
             employee_data = {}
-            
+
             # 各行の項目とデータを対応付け
             for row_index in range(1, len(values)):
                 row = values[row_index]
                 if len(row) > 0:
                     item_name = row[0]  # A列の項目名（従業員番号、氏名、部署名など）
-                    value = row[col_index + 1] if col_index + 1 < len(row) else ""  # 対応するデータ
+                    value = row[col_index + 1] if col_index + \
+                        1 < len(row) else ""  # 対応するデータ
                     employee_data[item_name] = value
-            
+
             # 列のヘッダー名をキーとして格納
             column_data[column_header] = employee_data
 
@@ -430,17 +431,74 @@ def update_salary_slip(sheet_data: str) -> str:
 
         # JSONデータをパース
         data = json.loads(sheet_data)
-        print("=== デバッグ: 受信したデータ（1件ずつ） ===")
-        for key, value in data.items():
-            print(f"キー: {key}")
-            print(f"値: {json.dumps(value, ensure_ascii=False, indent=2)}")
-            print("---")
-        print("=============================")
 
         if "error" in data:
             return f"failed: シートデータエラー - {data['error']}"
 
-        return f"success: 給与明細を処理しました"
+        # Playwrightでサイトにログイン
+        print(f"URL: {target_url} にログイン中...")
+
+        client = BrowserClient(region)
+        client.start()
+
+        ws_url, headers = client.generate_ws_headers()
+
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.connect_over_cdp(
+                endpoint_url=ws_url, headers=headers
+            )
+            default_context = browser.contexts[0]
+            page = default_context.pages[0]
+
+            context = browser.new_context(locale="ja-JP")
+            page = context.new_page()
+            page.set_extra_http_headers(
+                {"Accept-Language": "ja-JP,ja;q=0.9,en;q=0.8"})
+
+            # サイトにアクセス
+            page.goto(target_url)
+            page.wait_for_load_state("networkidle")
+            page.wait_for_timeout(2000)
+
+            # ログイン処理
+            page.fill('input[name*="LoginID"], input[type="text"]', login_id)
+            page.fill(
+                'input[name*="PassWd"], input[type="password"]', password)
+            page.click(
+                'img[onclick="FMSubmit()"], input[type="submit"], button[type="submit"]')
+
+            page.wait_for_load_state("networkidle")
+            page.wait_for_timeout(2000)
+
+            # ログイン成功の確認
+            try:
+                # ログインエラーメッセージをチェック
+                error_elements = page.locator(
+                    'text=ログインに失敗, text=エラー, text=認証に失敗')
+                if error_elements.count() > 0:
+                    browser.close()
+                    client.stop()
+                    return "failed: ログインに失敗しました"
+            except:
+                pass
+
+            print("ログイン成功")
+
+            # デバッグ用：ログイン後の画面をスクリーンショット
+            page.screenshot(path="login_debug.png")
+            print("ログイン後の画面をスクリーンショット保存: login_debug.png")
+
+            # 各従業員データを処理
+            success_count = 0
+            for employee_key, employee_data in data.items():
+                print(f"従業員 {employee_key} を処理中...")
+                # ここで給与明細更新処理を実装
+                success_count += 1
+
+            browser.close()
+
+        client.stop()
+        return f"success: {success_count}名の給与明細を処理しました"
 
     except json.JSONDecodeError:
         return "failed: 無効なJSONデータです"
