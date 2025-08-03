@@ -484,6 +484,26 @@ def update_salary_slip(sheet_data: str) -> str:
 
             print("ログイン成功")
 
+            # モーダルを閉じる
+            try:
+                close_button = page.locator(
+                    '.g-modal-close-tour, .g-modal-close')
+                if close_button.count() > 0:
+                    close_button.first.click()
+                    page.wait_for_timeout(1000)
+            except:
+                pass
+
+            # モーダルを閉じる
+            try:
+                close_button = page.locator(
+                    '.g-modal-close-tour, .g-modal-close')
+                if close_button.count() > 0:
+                    close_button.first.click()
+                    page.wait_for_timeout(1000)
+            except:
+                pass
+
             # デバッグ用：ログイン後の画面をスクリーンショット
             page.screenshot(path="login_debug.png")
             print("ログイン後の画面をスクリーンショット保存: login_debug.png")
