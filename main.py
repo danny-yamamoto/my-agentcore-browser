@@ -504,6 +504,25 @@ def update_salary_slip(sheet_data: str) -> str:
             except:
                 pass
 
+            # 給与メニューボタンをクリック
+            try:
+                salary_menu = page.locator('a.btnMain_1:has-text("給与メニュー")')
+                if salary_menu.count() > 0:
+                    salary_menu.first.click()
+                    page.wait_for_timeout(1000)
+            except:
+                pass
+
+            # 給与明細入力ボタンをクリック
+            try:
+                salary_detail_input = page.locator(
+                    'a.btnMain_0:has-text("給与明細入力")')
+                if salary_detail_input.count() > 0:
+                    salary_detail_input.first.click()
+                    page.wait_for_timeout(1000)
+            except:
+                pass
+
             # デバッグ用：ログイン後の画面をスクリーンショット
             page.screenshot(path="login_debug.png")
             print("ログイン後の画面をスクリーンショット保存: login_debug.png")
