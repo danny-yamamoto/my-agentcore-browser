@@ -430,8 +430,11 @@ def update_salary_slip(sheet_data: str) -> str:
 
         # JSONデータをパース
         data = json.loads(sheet_data)
-        print("=== デバッグ: 受信したデータ ===")
-        print(json.dumps(data, ensure_ascii=False, indent=2))
+        print("=== デバッグ: 受信したデータ（1件ずつ） ===")
+        for key, value in data.items():
+            print(f"キー: {key}")
+            print(f"値: {json.dumps(value, ensure_ascii=False, indent=2)}")
+            print("---")
         print("=============================")
 
         if "error" in data:
