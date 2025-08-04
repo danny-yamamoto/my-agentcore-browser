@@ -523,6 +523,51 @@ def update_salary_slip(sheet_data: str) -> str:
             except:
                 pass
 
+            # 検索ボタンをクリック
+            try:
+                # 検索ボタンクリック前のページ数を記録
+                initial_pages = len(context.pages)
+                print(f"検索ボタンクリック前のページ数: {initial_pages}")
+                search_button = page.locator(
+                    'input[type="button"].btn[value="検索"][onclick="Search()"]')
+                if search_button.count() > 0:
+                    search_button.first.click()
+                    page.wait_for_timeout(1000)
+                    print("検索ボタンをクリックしました")
+            except:
+                pass
+
+            try:
+
+                # 新しいページが開くまで待機
+                page.wait_for_timeout(5000)
+
+                # 新しく開いたページを取得
+                current_pages = context.pages
+                print(f"検索ボタンクリック後のページ数: {len(current_pages)}")
+
+                if len(current_pages) > initial_pages:
+                    new_page = current_pages[-1]  # 最新のページを取得
+                    print(f"新しいページURL: {new_page.url}")
+
+                    try:
+                        new_page.wait_for_load_state(
+                            "networkidle", timeout=10000)
+                        new_page.wait_for_timeout(3000)
+                        print("検索画面のスクリーンショットを撮影中...")
+                        new_page.screenshot(path="search_screen.png")
+                        print("検索画面のスクリーンショット撮影完了")
+                    except Exception as screenshot_error:
+                        print(f"スクリーンショット撮影エラー: {screenshot_error}")
+                else:
+                    print("新しいページが検出されませんでした")
+
+                    # 印刷ウィンドウを閉じる
+                    new_page.close()
+            except Exception as e:
+                print(f"検索ウィンドウ処理エラー: {e}")
+                pass
+
             # デバッグ用：ログイン後の画面をスクリーンショット
             page.screenshot(path="login_debug.png")
             print("ログイン後の画面をスクリーンショット保存: login_debug.png")
