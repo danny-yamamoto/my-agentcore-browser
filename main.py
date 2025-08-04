@@ -585,27 +585,110 @@ def update_salary_slip(sheet_data: str) -> str:
                                 select_btn = new_page.locator(
                                     f'input[type="button"].btn[value="選択"][name="show_btn0"][onclick="Show(\'{employee_key}\')"]')
                                 if select_btn.count() > 0:
+                                    print("選択前のスクリーンショットを撮影中...")
+                                    new_page.screenshot(
+                                        path="search_before_select.png")
+
                                     select_btn.first.click()
                                     print(f"選択ボタン（{employee_key}）をクリックしました")
-                                    new_page.wait_for_timeout(
-                                        2000)  # 選択後の画面遷移を待機
+
+                                    # 選択ボタンクリック後はnew_pageが自動でcloseされるため
+                                    # メインのpageで待機
+                                    page.wait_for_timeout(2000)
+                                else:
+                                    print("選択ボタンが見つかりません")
+                                    new_page.close()
                             except Exception as select_error:
                                 print(f"選択ボタンクリックエラー: {select_error}")
-
-                            print("検索画面のスクリーンショットを撮影中...")
-                            new_page.screenshot(path="search_screen.png")
-                            print("検索画面のスクリーンショット撮影完了")
-                            # 検索ウィンドウを閉じる
-                            new_page.close()
+                                # エラー時は手動でcloseを試行
+                                try:
+                                    new_page.close()
+                                except:
+                                    pass
                         except Exception as screenshot_error:
                             print(f"スクリーンショット撮影エラー: {screenshot_error}")
                     else:
                         print("新しいページが検出されませんでした")
-                        # 検索ウィンドウを閉じる
-                        new_page.close()
                 except Exception as e:
                     print(f"検索ウィンドウ処理エラー: {e}")
                     pass
+
+                # 選択後、メインページで編集ボタンをクリック
+                page.wait_for_timeout(1000)  # 画面更新を待機
+
+                # 編集ボタンをクリック
+                try:
+                    edit_button = page.locator(
+                        'input[name="BtnEdit"][value="編集"]')
+                    if edit_button.count() > 0:
+                        print(f"編集ボタン（{employee_key}）をクリックしました")
+                        edit_button.first.click()
+                        page.wait_for_timeout(2000)  # 待機時間を延長
+                        # 編集画面の表示確認
+                        page.screenshot(path=f"edit_screen_{employee_key}.png")
+                        print(
+                            f"編集画面のスクリーンショットを保存: edit_screen_{employee_key}.png")
+                    else:
+                        print(f"編集ボタンが見つかりません（{employee_key}）")
+                except Exception as e:
+                    print(f"編集ボタンクリックエラー: {e}")
+
+                # WorkDaysフィールドに30を入力
+                try:
+                    work_days_field = page.locator('input[name="WorkDays"]')
+                    if work_days_field.count() > 0:
+                        work_days_field.first.fill('30')
+                        print(f"WorkDaysフィールドに30を入力しました")
+                        page.wait_for_timeout(500)
+                except Exception as e:
+                    print(f"WorkDays入力エラー: {e}")
+
+                # WorkHoursフィールドに時間を入力
+                try:
+                    work_hours_field = page.locator('input[name="WorkHours"]')
+                    if work_hours_field.count() > 0:
+                        work_hours_field.first.fill('240')
+                        print(f"WorkHoursフィールドに240を入力しました")
+                        page.wait_for_timeout(500)
+                except Exception as e:
+                    print(f"WorkHours入力エラー: {e}")
+
+                # 再計算ボタンをクリック
+                try:
+                    recalc_button = page.locator(
+                        'input[name="BtnRunCalcAll"][value="再計算"]')
+                    if recalc_button.count() > 0:
+                        recalc_button.first.click()
+                        print(f"再計算ボタンをクリックしました")
+                        page.wait_for_timeout(500)
+                except Exception as e:
+                    print(f"再計算ボタンエラー: {e}")
+
+                # 確認ダイアログのOKをクリック
+                try:
+                    page.on("dialog", lambda dialog: dialog.accept())
+                    page.wait_for_timeout(1000)
+                except Exception as e:
+                    print(f"ダイアログエラー: {e}")
+
+                # 登録ボタンをクリック
+                try:
+                    submit_button = page.locator(
+                        'input[name="BtnSubmit"][value="登録"]')
+                    if submit_button.count() > 0:
+                        submit_button.first.click()
+                        print(f"登録ボタンをクリックしました")
+                        page.wait_for_timeout(1000)
+                except Exception as e:
+                    print(f"登録ボタンエラー: {e}")
+
+                # 確認ダイアログのOKをクリック
+                try:
+                    page.on("dialog", lambda dialog: dialog.accept())
+                    page.wait_for_timeout(1000)
+                except Exception as e:
+                    print(f"確認ダイアログエラー: {e}")
+
                 # ==========================
                 success_count += 1
 
