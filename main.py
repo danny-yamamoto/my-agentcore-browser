@@ -11,6 +11,9 @@ from strands import Agent, tool
 from strands.models import BedrockModel
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
+from bedrock_agentcore.runtime import BedrockAgentCoreApp
+from bedrock_agentcore import RequestContext
+
 
 # .envファイルから環境変数を読み込み
 load_dotenv()
@@ -432,11 +435,16 @@ bedrock = BedrockModel(
 
 agent = Agent(model=bedrock, tools=[get_sheet_data, update_salary_slip])
 
+app = BedrockAgentCoreApp()
+
+
+@app.entrypoint
+def invoke(payload: dict, context: RequestContext):
+    """Process user input and return a response"""
+    user_message = payload.get("prompt")
+    result = agent(user_message)
+    return {"result": result.message}
+
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print('使用方法: python main.py "プロンプト"')
-        sys.exit(1)
-
-    prompt = sys.argv[1]
-    agent(prompt)
+    app.run()
