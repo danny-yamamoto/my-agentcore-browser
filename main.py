@@ -1,6 +1,7 @@
 import sys
 import json
 import os
+import logging
 from typing import List, Dict, Any
 from dotenv import load_dotenv
 
@@ -14,273 +15,13 @@ from google.oauth2 import service_account
 # .envファイルから環境変数を読み込み
 load_dotenv()
 
+# ログ設定
+log_level = os.getenv('LOG_LEVEL', 'INFO')
+logging.basicConfig(level=getattr(logging, log_level),
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 region = "us-east-1"
-
-
-@tool
-def capture_page(url: str) -> str:
-    """
-    URLにアクセスし、スクリーンショットを取得します。
-    取得したスクリーンショットのファイルパスを返却します。
-    """
-
-    file_name = "image.png"
-
-    client = BrowserClient(region)
-    client.start()
-
-    ws_url, headers = client.generate_ws_headers()
-
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.connect_over_cdp(
-            endpoint_url=ws_url, headers=headers
-        )
-        default_context = browser.contexts[0]
-        page = default_context.pages[0]
-
-        context = browser.new_context(locale="ja-JP")
-        page = context.new_page()
-        page.set_extra_http_headers(
-            {"Accept-Language": "ja-JP,ja;q=0.9,en;q=0.8"})
-        page.goto(url)
-        page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(2000)
-
-        page.screenshot(path=file_name)
-
-        browser.close()
-
-    client.stop()
-
-    return file_name
-
-
-@tool
-def login_to_page(url: str, login_id: str, password: str) -> str:
-    """
-    指定されたURLにアクセスし、ログインIDとパスワードを入力してログインします。
-    ログイン後のスクリーンショットのファイルパスを返却します。
-    """
-
-    file_name = "login_result.png"
-
-    client = BrowserClient(region)
-    client.start()
-
-    ws_url, headers = client.generate_ws_headers()
-
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.connect_over_cdp(
-            endpoint_url=ws_url, headers=headers
-        )
-        default_context = browser.contexts[0]
-        page = default_context.pages[0]
-
-        context = browser.new_context(locale="ja-JP")
-        page = context.new_page()
-        page.set_extra_http_headers(
-            {"Accept-Language": "ja-JP,ja;q=0.9,en;q=0.8"})
-        page.goto(url)
-        page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(2000)
-
-        page.fill('input[name*="LoginID"], input[type="text"]', login_id)
-        page.fill('input[name*="PassWd"], input[type="password"]', password)
-
-        page.click(
-            'img[onclick="FMSubmit()"], input[type="submit"], button[type="submit"]')
-
-        page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(2000)
-
-        # モーダルを閉じる
-        try:
-            close_button = page.locator('.g-modal-close-tour, .g-modal-close')
-            if close_button.count() > 0:
-                close_button.first.click()
-                page.wait_for_timeout(1000)
-        except:
-            pass
-
-        # モーダルを閉じる
-        try:
-            close_button = page.locator('.g-modal-close-tour, .g-modal-close')
-            if close_button.count() > 0:
-                close_button.first.click()
-                page.wait_for_timeout(1000)
-        except:
-            pass
-
-        # 給与メニューボタンをクリック
-        try:
-            salary_menu = page.locator('a.btnMain_1:has-text("給与メニュー")')
-            if salary_menu.count() > 0:
-                salary_menu.first.click()
-                page.wait_for_timeout(1000)
-        except:
-            pass
-
-        # 給与明細入力ボタンをクリック
-        try:
-            salary_detail_input = page.locator(
-                'a.btnMain_0:has-text("給与明細入力")')
-            if salary_detail_input.count() > 0:
-                salary_detail_input.first.click()
-                page.wait_for_timeout(1000)
-        except:
-            pass
-
-        # 編集ボタンをクリック
-        try:
-            edit_button = page.locator('input[name="BtnEdit"][value="編集"]')
-            if edit_button.count() > 0:
-                edit_button.first.click()
-                page.wait_for_timeout(1000)
-        except:
-            pass
-
-        # WorkDaysフィールドに30を入力
-        try:
-            work_days_field = page.locator('input[name="WorkDays"]')
-            if work_days_field.count() > 0:
-                work_days_field.first.fill('30')
-                page.wait_for_timeout(500)
-        except:
-            pass
-
-        # WorkHoursフィールドに時間を入力
-        try:
-            work_hours_field = page.locator('input[name="WorkHours"]')
-            if work_hours_field.count() > 0:
-                work_hours_field.first.fill('240')
-                page.wait_for_timeout(500)
-        except:
-            pass
-
-        # 再計算ボタンをクリック
-        try:
-            recalc_button = page.locator(
-                'input[name="BtnRunCalcAll"][value="再計算"]')
-            if recalc_button.count() > 0:
-                recalc_button.first.click()
-                page.wait_for_timeout(500)
-        except:
-            pass
-
-        # 確認ダイアログのOKをクリック
-        try:
-            page.on("dialog", lambda dialog: dialog.accept())
-            page.wait_for_timeout(1000)
-        except:
-            pass
-
-        # 登録ボタンをクリック
-        try:
-            submit_button = page.locator('input[name="BtnSubmit"][value="登録"]')
-            if submit_button.count() > 0:
-                submit_button.first.click()
-                page.wait_for_timeout(1000)
-        except:
-            pass
-
-        # 確認ダイアログのOKをクリック
-        try:
-            page.on("dialog", lambda dialog: dialog.accept())
-            page.wait_for_timeout(1000)
-        except:
-            pass
-
-        # 終了ボタンをクリック
-        try:
-            end_button = page.locator('input[value="終了"][onclick*="EndBack"]')
-            if end_button.count() > 0:
-                end_button.first.click()
-                page.wait_for_timeout(1000)
-        except:
-            pass
-
-        # 給与明細印刷ボタンをクリック
-        try:
-            salary_print_button = page.locator(
-                'a.btnMain_0:has-text("給与明細印刷")')
-            if salary_print_button.count() > 0:
-                salary_print_button.first.click()
-                page.wait_for_timeout(1000)
-        except:
-            pass
-
-        # 全選択/解除ボタンをクリック
-        try:
-            all_select_button = page.locator(
-                'input[value="全選択/解除"][onclick="AllChk()"]')
-            if all_select_button.count() > 0:
-                all_select_button.first.click()
-                page.wait_for_timeout(500)
-        except:
-            pass
-
-        # 印刷ボタンをクリック
-        try:
-            # 印刷ボタンクリック前のページ数を記録
-            initial_pages = len(context.pages)
-            print(f"印刷ボタンクリック前のページ数: {initial_pages}")
-
-            print_button = page.locator('input[name="BtnSubmit1"][value="印刷"]')
-            if print_button.count() > 0:
-                print_button.first.click()
-                page.wait_for_timeout(2000)
-        except:
-            pass
-
-        # 新しい印刷ウィンドウに切り替えてダウンロード
-        try:
-
-            # 新しいページが開くまで待機
-            page.wait_for_timeout(5000)
-
-            # 新しく開いたページを取得
-            current_pages = context.pages
-            print(f"印刷ボタンクリック後のページ数: {len(current_pages)}")
-
-            if len(current_pages) > initial_pages:
-                new_page = current_pages[-1]  # 最新のページを取得
-                print(f"新しいページURL: {new_page.url}")
-
-                try:
-                    new_page.wait_for_load_state("networkidle", timeout=10000)
-                    new_page.wait_for_timeout(3000)
-                    print("印刷画面のスクリーンショットを撮影中...")
-                    new_page.screenshot(path="print_screen.png")
-                    print("印刷画面のスクリーンショット撮影完了")
-                except Exception as screenshot_error:
-                    print(f"スクリーンショット撮影エラー: {screenshot_error}")
-            else:
-                print("新しいページが検出されませんでした")
-
-                # ダウンロードを開始
-                with new_page.expect_download() as download_info:
-                    download_button = new_page.locator(
-                        'cr-icon-button#download[aria-label="ダウンロード"]')
-                    if download_button.count() > 0:
-                        download_button.first.click()
-
-                # ダウンロードを保存
-                download = download_info.value
-                download.save_as("salary_statement.pdf")
-
-                # 印刷ウィンドウを閉じる
-                new_page.close()
-        except Exception as e:
-            print(f"印刷ウィンドウ処理エラー: {e}")
-            pass
-
-        page.screenshot(path=file_name)
-
-        browser.close()
-
-    client.stop()
-
-    return file_name
 
 
 @tool
@@ -355,7 +96,8 @@ def get_sheet_data(spreadsheet_name: str, sheet_name: str, service_account_file:
             # 列のヘッダー名をキーとして格納
             column_data[column_header] = employee_data
 
-        print(json.dumps(column_data, ensure_ascii=False, indent=2))
+        logger.debug("スプレッドシートデータ取得完了")
+        logger.debug(json.dumps(column_data, ensure_ascii=False, indent=2))
 
         return json.dumps(column_data, ensure_ascii=False, indent=2)
 
@@ -372,41 +114,6 @@ def get_sheet_data(spreadsheet_name: str, sheet_name: str, service_account_file:
                 "service_account": "Google Cloud Consoleで作成したサービスアカウントのJSONファイルが必要です"
             }
         }, ensure_ascii=False, indent=2)
-
-
-@tool
-def process_employee_salary(employee_id: str, employee_name: str, work_days: int, work_hours: int) -> str:
-    """
-    単一従業員の給与明細を更新します。
-
-    Args:
-        employee_id: 従業員番号
-        employee_name: 従業員名
-        work_days: 出勤日数
-        work_hours: 労働時間
-
-    Returns:
-        "success" または "failed" の処理結果
-    """
-    try:
-        # 環境変数から設定を取得
-        target_url = os.getenv("SALARY_URL")
-        login_id = os.getenv("LOGIN_ID")
-        password = os.getenv("PASSWORD")
-
-        if not all([target_url, login_id, password]):
-            return "failed: 環境変数が設定されていません"
-
-        # ダミー処理：実際の実装はここで給与システムにアクセス
-        # print(f"従業員 {employee_name}({employee_id}) の給与明細を更新中...")
-        # print(f"出勤日数: {work_days}日, 労働時間: {work_hours}時間")
-        # print(f"URL: {target_url} にログイン中...")
-
-        # 常に成功を返すダミー実装
-        return f"success: 従業員 {employee_name} の給与明細を更新しました"
-
-    except Exception as e:
-        return f"failed: {str(e)}"
 
 
 @tool
@@ -436,7 +143,7 @@ def update_salary_slip(sheet_data: str) -> str:
             return f"failed: シートデータエラー - {data['error']}"
 
         # Playwrightでサイトにログイン
-        print(f"URL: {target_url} にログイン中...")
+        logger.debug(f"URL: {target_url} にログイン中...")
 
         client = BrowserClient(region)
         client.start()
@@ -482,7 +189,7 @@ def update_salary_slip(sheet_data: str) -> str:
             except:
                 pass
 
-            print("ログイン成功")
+            logger.debug("ログイン成功")
 
             # モーダルを閉じる
             try:
@@ -526,11 +233,11 @@ def update_salary_slip(sheet_data: str) -> str:
             # 各従業員データを処理
             success_count = 0
             for employee_key, employee_data in data.items():
-                print(f"従業員 {employee_key} を処理中...")
+                logger.debug(f"従業員 {employee_key} を処理中...")
                 # ここで給与明細更新処理を実装
                 # 検索ボタンクリック前のページ数を記録
                 initial_pages = len(context.pages)
-                print(f"検索ボタンクリック前のページ数: {initial_pages}")
+                logger.debug(f"検索ボタンクリック前のページ数: {initial_pages}")
                 # ==========================
                 # 検索ボタンをクリック
                 try:
@@ -539,7 +246,7 @@ def update_salary_slip(sheet_data: str) -> str:
                     if search_button.count() > 0:
                         search_button.first.click()
                         page.wait_for_timeout(1000)
-                        print("検索ボタンをクリックしました")
+                        logger.debug("検索ボタンをクリックしました")
                 except:
                     pass
 
@@ -548,10 +255,10 @@ def update_salary_slip(sheet_data: str) -> str:
                     page.wait_for_timeout(5000)
                     # 新しく開いたページを取得
                     current_pages = context.pages
-                    print(f"検索ボタンクリック後のページ数: {len(current_pages)}")
+                    logger.debug(f"検索ボタンクリック後のページ数: {len(current_pages)}")
                     if len(current_pages) > initial_pages:
                         new_page = current_pages[-1]  # 最新のページを取得
-                        print(f"新しいページURL: {new_page.url}")
+                        logger.debug(f"新しいページURL: {new_page.url}")
                         try:
                             new_page.wait_for_load_state(
                                 "networkidle", timeout=10000)
@@ -563,10 +270,11 @@ def update_salary_slip(sheet_data: str) -> str:
                                     'input[type="text"].inpK[name="keywd"]')
                                 if keyword_field.count() > 0:
                                     keyword_field.first.fill(employee_key)
-                                    print(f"従業員番号 {employee_key} を入力しました")
+                                    logger.debug(
+                                        f"従業員番号 {employee_key} を入力しました")
                                     new_page.wait_for_timeout(1000)
                             except Exception as input_error:
-                                print(f"従業員番号入力エラー: {input_error}")
+                                logger.debug(f"従業員番号入力エラー: {input_error}")
 
                             # 検索ボタンをクリック
                             try:
@@ -574,43 +282,44 @@ def update_salary_slip(sheet_data: str) -> str:
                                     'input[type="button"].btnS[onclick="SubmitFm()"][value="検索"]')
                                 if search_btn.count() > 0:
                                     search_btn.first.click()
-                                    print("検索ボタンをクリックしました")
+                                    logger.debug("検索ボタンをクリックしました")
                                     new_page.wait_for_timeout(
                                         2000)  # 検索結果の読み込みを待機
                             except Exception as search_error:
-                                print(f"検索ボタンクリックエラー: {search_error}")
+                                logger.error(f"検索ボタンクリックエラー: {search_error}")
 
                             # 選択ボタンをクリック
                             try:
                                 select_btn = new_page.locator(
                                     f'input[type="button"].btn[value="選択"][name="show_btn0"][onclick="Show(\'{employee_key}\')"]')
                                 if select_btn.count() > 0:
-                                    print("選択前のスクリーンショットを撮影中...")
+                                    logger.debug("選択前のスクリーンショットを撮影中...")
                                     new_page.screenshot(
                                         path="search_before_select.png")
 
                                     select_btn.first.click()
-                                    print(f"選択ボタン（{employee_key}）をクリックしました")
+                                    logger.debug(
+                                        f"選択ボタン（{employee_key}）をクリックしました")
 
                                     # 選択ボタンクリック後はnew_pageが自動でcloseされるため
                                     # メインのpageで待機
                                     page.wait_for_timeout(2000)
                                 else:
-                                    print("選択ボタンが見つかりません")
+                                    logger.error("選択ボタンが見つかりません")
                                     new_page.close()
                             except Exception as select_error:
-                                print(f"選択ボタンクリックエラー: {select_error}")
+                                logger.error(f"選択ボタンクリックエラー: {select_error}")
                                 # エラー時は手動でcloseを試行
                                 try:
                                     new_page.close()
                                 except:
                                     pass
                         except Exception as screenshot_error:
-                            print(f"スクリーンショット撮影エラー: {screenshot_error}")
+                            logger.error(f"スクリーンショット撮影エラー: {screenshot_error}")
                     else:
-                        print("新しいページが検出されませんでした")
+                        logger.error("新しいページが検出されませんでした")
                 except Exception as e:
-                    print(f"検索ウィンドウ処理エラー: {e}")
+                    logger.error(f"検索ウィンドウ処理エラー: {e}")
                     pass
 
                 # 選択後、メインページで編集ボタンをクリック
@@ -621,17 +330,17 @@ def update_salary_slip(sheet_data: str) -> str:
                     edit_button = page.locator(
                         'input[name="BtnEdit"][value="編集"]')
                     if edit_button.count() > 0:
-                        print(f"編集ボタン（{employee_key}）をクリックしました")
+                        logger.debug(f"編集ボタン（{employee_key}）をクリックしました")
                         edit_button.first.click()
                         page.wait_for_timeout(2000)  # 待機時間を延長
                         # 編集画面の表示確認
                         page.screenshot(path=f"edit_screen_{employee_key}.png")
-                        print(
+                        logger.debug(
                             f"編集画面のスクリーンショットを保存: edit_screen_{employee_key}.png")
                     else:
-                        print(f"編集ボタンが見つかりません（{employee_key}）")
+                        logger.debug(f"編集ボタンが見つかりません（{employee_key}）")
                 except Exception as e:
-                    print(f"編集ボタンクリックエラー: {e}")
+                    logger.error(f"編集ボタンクリックエラー: {e}")
 
                 # JSONデータから出勤日数と勤務時間を取得
                 work_days_value = employee_data.get('出勤日数', '30')
@@ -642,20 +351,21 @@ def update_salary_slip(sheet_data: str) -> str:
                     work_days_field = page.locator('input[name="WorkDays"]')
                     if work_days_field.count() > 0:
                         work_days_field.first.fill(work_days_value)
-                        print(f"WorkDaysフィールドに{work_days_value}を入力しました")
+                        logger.debug(f"WorkDaysフィールドに{work_days_value}を入力しました")
                         page.wait_for_timeout(500)
                 except Exception as e:
-                    print(f"WorkDays入力エラー: {e}")
+                    logger.error(f"WorkDays入力エラー: {e}")
 
                 # WorkHoursフィールドに時間を入力
                 try:
                     work_hours_field = page.locator('input[name="WorkHours"]')
                     if work_hours_field.count() > 0:
                         work_hours_field.first.fill(work_hours_value)
-                        print(f"WorkHoursフィールドに{work_hours_value}を入力しました")
+                        logger.debug(
+                            f"WorkHoursフィールドに{work_hours_value}を入力しました")
                         page.wait_for_timeout(500)
                 except Exception as e:
-                    print(f"WorkHours入力エラー: {e}")
+                    logger.error(f"WorkHours入力エラー: {e}")
 
                 # 再計算ボタンをクリック（ダイアログハンドラー付き）
                 try:
@@ -663,9 +373,9 @@ def update_salary_slip(sheet_data: str) -> str:
                     def recalc_dialog_handler(dialog):
                         try:
                             dialog.accept()
-                            print("再計算確認ダイアログを受諾しました")
+                            logger.debug("再計算確認ダイアログを受諾しました")
                         except Exception as e:
-                            print(f"再計算ダイアログ処理エラー: {e}")
+                            logger.error(f"再計算ダイアログ処理エラー: {e}")
 
                     page.once("dialog", recalc_dialog_handler)
 
@@ -673,10 +383,10 @@ def update_salary_slip(sheet_data: str) -> str:
                         'input[name="BtnRunCalcAll"][value="再計算"]')
                     if recalc_button.count() > 0:
                         recalc_button.first.click()
-                        print(f"再計算ボタンをクリックしました")
+                        logger.debug(f"再計算ボタンをクリックしました")
                         page.wait_for_timeout(1000)  # ダイアログ処理待機
                 except Exception as e:
-                    print(f"再計算ボタンエラー: {e}")
+                    logger.error(f"再計算ボタンエラー: {e}")
 
                 # 登録ボタンをクリック（ダイアログハンドラー付き）
                 try:
@@ -684,9 +394,9 @@ def update_salary_slip(sheet_data: str) -> str:
                     def submit_dialog_handler(dialog):
                         try:
                             dialog.accept()
-                            print("登録確認ダイアログを受諾しました")
+                            logger.debug("登録確認ダイアログを受諾しました")
                         except Exception as e:
-                            print(f"登録ダイアログ処理エラー: {e}")
+                            logger.error(f"登録ダイアログ処理エラー: {e}")
 
                     page.once("dialog", submit_dialog_handler)
 
@@ -694,17 +404,17 @@ def update_salary_slip(sheet_data: str) -> str:
                         'input[name="BtnSubmit"][value="登録"]')
                     if submit_button.count() > 0:
                         submit_button.first.click()
-                        print(f"登録ボタンをクリックしました")
+                        logger.debug(f"登録ボタンをクリックしました")
                         page.wait_for_timeout(1000)  # ダイアログ処理待機
                 except Exception as e:
-                    print(f"登録ボタンエラー: {e}")
+                    logger.error(f"登録ボタンエラー: {e}")
 
                 # ==========================
                 success_count += 1
 
             # デバッグ用：ログイン後の画面をスクリーンショット
             page.screenshot(path="login_debug.png")
-            print("ログイン後の画面をスクリーンショット保存: login_debug.png")
+            logger.debug("ログイン後の画面をスクリーンショット保存: login_debug.png")
 
             browser.close()
 
@@ -720,8 +430,7 @@ def update_salary_slip(sheet_data: str) -> str:
 bedrock = BedrockModel(
     model_id="us.anthropic.claude-sonnet-4-20250514-v1:0", region_name=region)
 
-agent = Agent(model=bedrock, tools=[
-              capture_page, login_to_page, get_sheet_data, process_employee_salary, update_salary_slip])
+agent = Agent(model=bedrock, tools=[get_sheet_data, update_salary_slip])
 
 
 if __name__ == "__main__":
