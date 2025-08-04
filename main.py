@@ -570,13 +570,27 @@ def update_salary_slip(sheet_data: str) -> str:
 
                             # 検索ボタンをクリック
                             try:
-                                search_btn = new_page.locator('input[type="button"].btnS[onclick="SubmitFm()"][value="検索"]')
+                                search_btn = new_page.locator(
+                                    'input[type="button"].btnS[onclick="SubmitFm()"][value="検索"]')
                                 if search_btn.count() > 0:
                                     search_btn.first.click()
                                     print("検索ボタンをクリックしました")
-                                    new_page.wait_for_timeout(2000)  # 検索結果の読み込みを待機
+                                    new_page.wait_for_timeout(
+                                        2000)  # 検索結果の読み込みを待機
                             except Exception as search_error:
                                 print(f"検索ボタンクリックエラー: {search_error}")
+
+                            # 選択ボタンをクリック
+                            try:
+                                select_btn = new_page.locator(
+                                    f'input[type="button"].btn[value="選択"][name="show_btn0"][onclick="Show(\'{employee_key}\')"]')
+                                if select_btn.count() > 0:
+                                    select_btn.first.click()
+                                    print(f"選択ボタン（従業員{employee_key}）をクリックしました")
+                                    new_page.wait_for_timeout(
+                                        2000)  # 選択後の画面遷移を待機
+                            except Exception as select_error:
+                                print(f"選択ボタンクリックエラー: {select_error}")
 
                             print("検索画面のスクリーンショットを撮影中...")
                             new_page.screenshot(path="search_screen.png")
