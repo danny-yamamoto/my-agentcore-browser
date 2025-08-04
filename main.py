@@ -586,7 +586,7 @@ def update_salary_slip(sheet_data: str) -> str:
                                     f'input[type="button"].btn[value="選択"][name="show_btn0"][onclick="Show(\'{employee_key}\')"]')
                                 if select_btn.count() > 0:
                                     select_btn.first.click()
-                                    print(f"選択ボタン（従業員{employee_key}）をクリックしました")
+                                    print(f"選択ボタン（{employee_key}）をクリックしました")
                                     new_page.wait_for_timeout(
                                         2000)  # 選択後の画面遷移を待機
                             except Exception as select_error:
