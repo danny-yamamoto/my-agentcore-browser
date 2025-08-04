@@ -633,12 +633,16 @@ def update_salary_slip(sheet_data: str) -> str:
                 except Exception as e:
                     print(f"編集ボタンクリックエラー: {e}")
 
-                # WorkDaysフィールドに30を入力
+                # JSONデータから出勤日数と勤務時間を取得
+                work_days_value = employee_data.get('出勤日数', '30')
+                work_hours_value = employee_data.get('勤務時間', '240')
+
+                # WorkDaysフィールドに値を入力
                 try:
                     work_days_field = page.locator('input[name="WorkDays"]')
                     if work_days_field.count() > 0:
-                        work_days_field.first.fill('30')
-                        print(f"WorkDaysフィールドに30を入力しました")
+                        work_days_field.first.fill(work_days_value)
+                        print(f"WorkDaysフィールドに{work_days_value}を入力しました")
                         page.wait_for_timeout(500)
                 except Exception as e:
                     print(f"WorkDays入力エラー: {e}")
@@ -647,8 +651,8 @@ def update_salary_slip(sheet_data: str) -> str:
                 try:
                     work_hours_field = page.locator('input[name="WorkHours"]')
                     if work_hours_field.count() > 0:
-                        work_hours_field.first.fill('240')
-                        print(f"WorkHoursフィールドに240を入力しました")
+                        work_hours_field.first.fill(work_hours_value)
+                        print(f"WorkHoursフィールドに{work_hours_value}を入力しました")
                         page.wait_for_timeout(500)
                 except Exception as e:
                     print(f"WorkHours入力エラー: {e}")
@@ -662,9 +666,9 @@ def update_salary_slip(sheet_data: str) -> str:
                             print("再計算確認ダイアログを受諾しました")
                         except Exception as e:
                             print(f"再計算ダイアログ処理エラー: {e}")
-                    
+
                     page.once("dialog", recalc_dialog_handler)
-                    
+
                     recalc_button = page.locator(
                         'input[name="BtnRunCalcAll"][value="再計算"]')
                     if recalc_button.count() > 0:
@@ -683,9 +687,9 @@ def update_salary_slip(sheet_data: str) -> str:
                             print("登録確認ダイアログを受諾しました")
                         except Exception as e:
                             print(f"登録ダイアログ処理エラー: {e}")
-                    
+
                     page.once("dialog", submit_dialog_handler)
-                    
+
                     submit_button = page.locator(
                         'input[name="BtnSubmit"][value="登録"]')
                     if submit_button.count() > 0:
