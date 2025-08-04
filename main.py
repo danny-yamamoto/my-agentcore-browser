@@ -653,41 +653,47 @@ def update_salary_slip(sheet_data: str) -> str:
                 except Exception as e:
                     print(f"WorkHours入力エラー: {e}")
 
-                # 再計算ボタンをクリック
+                # 再計算ボタンをクリック（ダイアログハンドラー付き）
                 try:
+                    # 一時的なダイアログハンドラーを設定
+                    def recalc_dialog_handler(dialog):
+                        try:
+                            dialog.accept()
+                            print("再計算確認ダイアログを受諾しました")
+                        except Exception as e:
+                            print(f"再計算ダイアログ処理エラー: {e}")
+                    
+                    page.once("dialog", recalc_dialog_handler)
+                    
                     recalc_button = page.locator(
                         'input[name="BtnRunCalcAll"][value="再計算"]')
                     if recalc_button.count() > 0:
                         recalc_button.first.click()
                         print(f"再計算ボタンをクリックしました")
-                        page.wait_for_timeout(500)
+                        page.wait_for_timeout(1000)  # ダイアログ処理待機
                 except Exception as e:
                     print(f"再計算ボタンエラー: {e}")
 
-                # 確認ダイアログのOKをクリック
+                # 登録ボタンをクリック（ダイアログハンドラー付き）
                 try:
-                    page.on("dialog", lambda dialog: dialog.accept())
-                    page.wait_for_timeout(1000)
-                except Exception as e:
-                    print(f"ダイアログエラー: {e}")
-
-                # 登録ボタンをクリック
-                try:
+                    # 一時的なダイアログハンドラーを設定
+                    def submit_dialog_handler(dialog):
+                        try:
+                            dialog.accept()
+                            print("登録確認ダイアログを受諾しました")
+                        except Exception as e:
+                            print(f"登録ダイアログ処理エラー: {e}")
+                    
+                    page.once("dialog", submit_dialog_handler)
+                    
                     submit_button = page.locator(
                         'input[name="BtnSubmit"][value="登録"]')
                     if submit_button.count() > 0:
                         submit_button.first.click()
                         print(f"登録ボタンをクリックしました")
-                        page.wait_for_timeout(1000)
+                        page.wait_for_timeout(1000)  # ダイアログ処理待機
                 except Exception as e:
                     print(f"登録ボタンエラー: {e}")
-
-                # 確認ダイアログのOKをクリック
-                try:
-                    page.on("dialog", lambda dialog: dialog.accept())
-                    page.wait_for_timeout(1000)
-                except Exception as e:
-                    print(f"確認ダイアログエラー: {e}")
 
                 # ==========================
                 success_count += 1
