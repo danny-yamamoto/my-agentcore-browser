@@ -556,6 +556,18 @@ def update_salary_slip(sheet_data: str) -> str:
                             new_page.wait_for_load_state(
                                 "networkidle", timeout=10000)
                             new_page.wait_for_timeout(3000)
+
+                            # 従業員番号をテキストフィールドに入力
+                            try:
+                                keyword_field = new_page.locator(
+                                    'input[type="text"].inpK[name="keywd"]')
+                                if keyword_field.count() > 0:
+                                    keyword_field.first.fill(employee_key)
+                                    print(f"従業員番号 {employee_key} を入力しました")
+                                    new_page.wait_for_timeout(1000)
+                            except Exception as input_error:
+                                print(f"従業員番号入力エラー: {input_error}")
+
                             print("検索画面のスクリーンショットを撮影中...")
                             new_page.screenshot(path="search_screen.png")
                             print("検索画面のスクリーンショット撮影完了")
