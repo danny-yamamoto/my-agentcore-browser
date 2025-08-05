@@ -28,7 +28,7 @@ region = "us-east-1"
 
 
 @tool
-def get_sheet_data(spreadsheet_name: str, sheet_name: str, service_account_file: str = "service_account.json") -> str:
+def get_sheet_data(spreadsheet_name: str, sheet_name: str) -> str:
     """
     Google Sheetsからデータを取得します。
     A列に従業員番号、氏名、部署名、B列以降に従業員データが入力されている前提です。
@@ -36,15 +36,26 @@ def get_sheet_data(spreadsheet_name: str, sheet_name: str, service_account_file:
     Args:
         spreadsheet_name: スプレッドシートの名前またはID
         sheet_name: 取得するシート名（タブ名）
-        service_account_file: サービスアカウントのJSONファイルパス
 
     Returns:
         取得したデータをJSON形式の文字列で返却
     """
     try:
+        # 環境変数からサービスアカウント情報を取得
+        service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+        
+        if not service_account_json:
+            return json.dumps({
+                "error": "環境変数GOOGLE_SERVICE_ACCOUNT_JSONが設定されていません",
+                "help": "Google Cloud Consoleで作成したサービスアカウントのJSON文字列を設定してください"
+            }, ensure_ascii=False)
+        
+        # JSON文字列をパース
+        service_account_info = json.loads(service_account_json)
+        
         # サービスアカウント認証
-        credentials = service_account.Credentials.from_service_account_file(
-            service_account_file,
+        credentials = service_account.Credentials.from_service_account_info(
+            service_account_info,
             scopes=['https://www.googleapis.com/auth/spreadsheets.readonly']
         )
 
@@ -104,8 +115,8 @@ def get_sheet_data(spreadsheet_name: str, sheet_name: str, service_account_file:
 
         return json.dumps(column_data, ensure_ascii=False, indent=2)
 
-    except FileNotFoundError:
-        return json.dumps({"error": f"サービスアカウントファイル '{service_account_file}' が見つかりません"}, ensure_ascii=False)
+    except json.JSONDecodeError:
+        return json.dumps({"error": "GOOGLE_SERVICE_ACCOUNT_JSONの形式が正しくありません"}, ensure_ascii=False)
     except Exception as e:
         error_type = type(e).__name__
         return json.dumps({
@@ -114,7 +125,7 @@ def get_sheet_data(spreadsheet_name: str, sheet_name: str, service_account_file:
                 "使用方法": "python main.py \"[スプレッドシートID]の[シート名]からデータを取得して\"",
                 "spreadsheet_id": "スプレッドシートのURLから /spreadsheets/d/ 以降の文字列",
                 "sheet_name": "スプレッドシート下部のタブ名（例：'Sheet1', 'データ', '従業員一覧'）",
-                "service_account": "Google Cloud Consoleで作成したサービスアカウントのJSONファイルが必要です"
+                "service_account": "環境変数GOOGLE_SERVICE_ACCOUNT_JSONにサービスアカウントのJSON文字列を設定してください"
             }
         }, ensure_ascii=False, indent=2)
 
