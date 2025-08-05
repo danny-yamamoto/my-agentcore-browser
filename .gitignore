@@ -210,3 +210,5 @@ __marimo__/
 
 service_account.json
 credentials.json
+
+.bedrock_agentcore.yaml
