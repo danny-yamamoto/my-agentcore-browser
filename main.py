@@ -43,16 +43,16 @@ def get_sheet_data(spreadsheet_name: str, sheet_name: str) -> str:
     try:
         # 環境変数からサービスアカウント情報を取得
         service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-        
+
         if not service_account_json:
             return json.dumps({
                 "error": "環境変数GOOGLE_SERVICE_ACCOUNT_JSONが設定されていません",
                 "help": "Google Cloud Consoleで作成したサービスアカウントのJSON文字列を設定してください"
             }, ensure_ascii=False)
-        
+
         # JSON文字列をパース
         service_account_info = json.loads(service_account_json)
-        
+
         # サービスアカウント認証
         credentials = service_account.Credentials.from_service_account_info(
             service_account_info,
@@ -159,278 +159,302 @@ def update_salary_slip(sheet_data: str) -> str:
         # Playwrightでサイトにログイン
         logger.debug(f"URL: {target_url} にログイン中...")
 
-        client = BrowserClient(region)
-        client.start()
+        try:
+            client = BrowserClient(region)
+            logger.debug("BrowserClient作成完了")
 
-        ws_url, headers = client.generate_ws_headers()
+            client.start()
+            logger.debug("BrowserClient起動完了")
 
-        with sync_playwright() as playwright:
-            browser = playwright.chromium.connect_over_cdp(
-                endpoint_url=ws_url, headers=headers
-            )
-            default_context = browser.contexts[0]
-            page = default_context.pages[0]
+            ws_url, headers = client.generate_ws_headers()
+            logger.debug(f"WebSocket URL取得完了: {ws_url[:50]}...")
 
-            context = browser.new_context(locale="ja-JP")
-            page = context.new_page()
-            page.set_extra_http_headers(
-                {"Accept-Language": "ja-JP,ja;q=0.9,en;q=0.8"})
+        except Exception as e:
+            logger.error(f"BrowserClient初期化エラー: {e}")
+            return f"failed: ブラウザクライアント初期化失敗 - {str(e)}"
 
-            # サイトにアクセス
-            page.goto(target_url)
-            page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(2000)
+        try:
+            with sync_playwright() as playwright:
+                logger.debug("Playwright WebSocket接続試行中...")
+                browser = playwright.chromium.connect_over_cdp(
+                    endpoint_url=ws_url, headers=headers
+                )
+                logger.debug("Playwright WebSocket接続成功")
+                default_context = browser.contexts[0]
+                page = default_context.pages[0]
 
-            # ログイン処理
-            page.fill('input[name*="LoginID"], input[type="text"]', login_id)
-            page.fill(
-                'input[name*="PassWd"], input[type="password"]', password)
-            page.click(
-                'img[onclick="FMSubmit()"], input[type="submit"], button[type="submit"]')
+                context = browser.new_context(locale="ja-JP")
+                page = context.new_page()
+                page.set_extra_http_headers(
+                    {"Accept-Language": "ja-JP,ja;q=0.9,en;q=0.8"})
 
-            page.wait_for_load_state("networkidle")
-            page.wait_for_timeout(2000)
+                # サイトにアクセス
+                page.goto(target_url)
+                page.wait_for_load_state("networkidle")
+                page.wait_for_timeout(2000)
 
-            # ログイン成功の確認
-            try:
-                # ログインエラーメッセージをチェック
-                error_elements = page.locator(
-                    'text=ログインに失敗, text=エラー, text=認証に失敗')
-                if error_elements.count() > 0:
-                    browser.close()
-                    client.stop()
-                    return "failed: ログインに失敗しました"
-            except:
-                pass
+                # ログイン処理
+                page.fill(
+                    'input[name*="LoginID"], input[type="text"]', login_id)
+                page.fill(
+                    'input[name*="PassWd"], input[type="password"]', password)
+                page.click(
+                    'img[onclick="FMSubmit()"], input[type="submit"], button[type="submit"]')
 
-            logger.debug("ログイン成功")
+                page.wait_for_load_state("networkidle")
+                page.wait_for_timeout(2000)
 
-            # モーダルを閉じる
-            try:
-                close_button = page.locator(
-                    '.g-modal-close-tour, .g-modal-close')
-                if close_button.count() > 0:
-                    close_button.first.click()
-                    page.wait_for_timeout(1000)
-            except:
-                pass
-
-            # モーダルを閉じる
-            try:
-                close_button = page.locator(
-                    '.g-modal-close-tour, .g-modal-close')
-                if close_button.count() > 0:
-                    close_button.first.click()
-                    page.wait_for_timeout(1000)
-            except:
-                pass
-
-            # 給与メニューボタンをクリック
-            try:
-                salary_menu = page.locator('a.btnMain_1:has-text("給与メニュー")')
-                if salary_menu.count() > 0:
-                    salary_menu.first.click()
-                    page.wait_for_timeout(1000)
-            except:
-                pass
-
-            # 給与明細入力ボタンをクリック
-            try:
-                salary_detail_input = page.locator(
-                    'a.btnMain_0:has-text("給与明細入力")')
-                if salary_detail_input.count() > 0:
-                    salary_detail_input.first.click()
-                    page.wait_for_timeout(1000)
-            except:
-                pass
-
-            # 各従業員データを処理
-            success_count = 0
-            for employee_key, employee_data in data.items():
-                logger.debug(f"従業員 {employee_key} を処理中...")
-                # ここで給与明細更新処理を実装
-                # 検索ボタンクリック前のページ数を記録
-                initial_pages = len(context.pages)
-                logger.debug(f"検索ボタンクリック前のページ数: {initial_pages}")
-                # ==========================
-                # 検索ボタンをクリック
+                # ログイン成功の確認
                 try:
-                    search_button = page.locator(
-                        'input[type="button"].btn[value="検索"][onclick="Search()"]')
-                    if search_button.count() > 0:
-                        search_button.first.click()
-                        page.wait_for_timeout(1000)
-                        logger.debug("検索ボタンをクリックしました")
+                    # ログインエラーメッセージをチェック
+                    error_elements = page.locator(
+                        'text=ログインに失敗, text=エラー, text=認証に失敗')
+                    if error_elements.count() > 0:
+                        browser.close()
+                        client.stop()
+                        return "failed: ログインに失敗しました"
                 except:
                     pass
 
+                logger.debug("ログイン成功")
+
+                # モーダルを閉じる
                 try:
-                    # 新しいページが開くまで待機
-                    page.wait_for_timeout(5000)
-                    # 新しく開いたページを取得
-                    current_pages = context.pages
-                    logger.debug(f"検索ボタンクリック後のページ数: {len(current_pages)}")
-                    if len(current_pages) > initial_pages:
-                        new_page = current_pages[-1]  # 最新のページを取得
-                        logger.debug(f"新しいページURL: {new_page.url}")
-                        try:
-                            new_page.wait_for_load_state(
-                                "networkidle", timeout=10000)
-                            new_page.wait_for_timeout(3000)
-
-                            # 従業員番号をテキストフィールドに入力
-                            try:
-                                keyword_field = new_page.locator(
-                                    'input[type="text"].inpK[name="keywd"]')
-                                if keyword_field.count() > 0:
-                                    keyword_field.first.fill(employee_key)
-                                    logger.debug(
-                                        f"従業員番号 {employee_key} を入力しました")
-                                    new_page.wait_for_timeout(1000)
-                            except Exception as input_error:
-                                logger.debug(f"従業員番号入力エラー: {input_error}")
-
-                            # 検索ボタンをクリック
-                            try:
-                                search_btn = new_page.locator(
-                                    'input[type="button"].btnS[onclick="SubmitFm()"][value="検索"]')
-                                if search_btn.count() > 0:
-                                    search_btn.first.click()
-                                    logger.debug("検索ボタンをクリックしました")
-                                    new_page.wait_for_timeout(
-                                        2000)  # 検索結果の読み込みを待機
-                            except Exception as search_error:
-                                logger.error(f"検索ボタンクリックエラー: {search_error}")
-
-                            # 選択ボタンをクリック
-                            try:
-                                select_btn = new_page.locator(
-                                    f'input[type="button"].btn[value="選択"][name="show_btn0"][onclick="Show(\'{employee_key}\')"]')
-                                if select_btn.count() > 0:
-                                    logger.debug("選択前のスクリーンショットを撮影中...")
-                                    new_page.screenshot(
-                                        path="search_before_select.png")
-
-                                    select_btn.first.click()
-                                    logger.debug(
-                                        f"選択ボタン（{employee_key}）をクリックしました")
-
-                                    # 選択ボタンクリック後はnew_pageが自動でcloseされるため
-                                    # メインのpageで待機
-                                    page.wait_for_timeout(2000)
-                                else:
-                                    logger.error("選択ボタンが見つかりません")
-                                    new_page.close()
-                            except Exception as select_error:
-                                logger.error(f"選択ボタンクリックエラー: {select_error}")
-                                # エラー時は手動でcloseを試行
-                                try:
-                                    new_page.close()
-                                except:
-                                    pass
-                        except Exception as screenshot_error:
-                            logger.error(f"スクリーンショット撮影エラー: {screenshot_error}")
-                    else:
-                        logger.error("新しいページが検出されませんでした")
-                except Exception as e:
-                    logger.error(f"検索ウィンドウ処理エラー: {e}")
+                    close_button = page.locator(
+                        '.g-modal-close-tour, .g-modal-close')
+                    if close_button.count() > 0:
+                        close_button.first.click()
+                        page.wait_for_timeout(1000)
+                except:
                     pass
 
-                # 選択後、メインページで編集ボタンをクリック
-                page.wait_for_timeout(1000)  # 画面更新を待機
-
-                # 編集ボタンをクリック
+                # モーダルを閉じる
                 try:
-                    edit_button = page.locator(
-                        'input[name="BtnEdit"][value="編集"]')
-                    if edit_button.count() > 0:
-                        logger.debug(f"編集ボタン（{employee_key}）をクリックしました")
-                        edit_button.first.click()
-                        page.wait_for_timeout(2000)  # 待機時間を延長
-                        # 編集画面の表示確認
-                        page.screenshot(path=f"edit_screen_{employee_key}.png")
-                        logger.debug(
-                            f"編集画面のスクリーンショットを保存: edit_screen_{employee_key}.png")
-                    else:
-                        logger.debug(f"編集ボタンが見つかりません（{employee_key}）")
-                except Exception as e:
-                    logger.error(f"編集ボタンクリックエラー: {e}")
+                    close_button = page.locator(
+                        '.g-modal-close-tour, .g-modal-close')
+                    if close_button.count() > 0:
+                        close_button.first.click()
+                        page.wait_for_timeout(1000)
+                except:
+                    pass
 
-                # JSONデータから出勤日数と勤務時間を取得
-                work_days_value = employee_data.get('出勤日数', '30')
-                work_hours_value = employee_data.get('勤務時間', '240')
-
-                # WorkDaysフィールドに値を入力
+                # 給与メニューボタンをクリック
                 try:
-                    work_days_field = page.locator('input[name="WorkDays"]')
-                    if work_days_field.count() > 0:
-                        work_days_field.first.fill(work_days_value)
-                        logger.debug(f"WorkDaysフィールドに{work_days_value}を入力しました")
-                        page.wait_for_timeout(500)
-                except Exception as e:
-                    logger.error(f"WorkDays入力エラー: {e}")
+                    salary_menu = page.locator(
+                        'a.btnMain_1:has-text("給与メニュー")')
+                    if salary_menu.count() > 0:
+                        salary_menu.first.click()
+                        page.wait_for_timeout(1000)
+                except:
+                    pass
 
-                # WorkHoursフィールドに時間を入力
+                # 給与明細入力ボタンをクリック
                 try:
-                    work_hours_field = page.locator('input[name="WorkHours"]')
-                    if work_hours_field.count() > 0:
-                        work_hours_field.first.fill(work_hours_value)
-                        logger.debug(
-                            f"WorkHoursフィールドに{work_hours_value}を入力しました")
-                        page.wait_for_timeout(500)
-                except Exception as e:
-                    logger.error(f"WorkHours入力エラー: {e}")
+                    salary_detail_input = page.locator(
+                        'a.btnMain_0:has-text("給与明細入力")')
+                    if salary_detail_input.count() > 0:
+                        salary_detail_input.first.click()
+                        page.wait_for_timeout(1000)
+                except:
+                    pass
 
-                # 再計算ボタンをクリック（ダイアログハンドラー付き）
-                try:
-                    # 一時的なダイアログハンドラーを設定
-                    def recalc_dialog_handler(dialog):
-                        try:
-                            dialog.accept()
-                            logger.debug("再計算確認ダイアログを受諾しました")
-                        except Exception as e:
-                            logger.error(f"再計算ダイアログ処理エラー: {e}")
+                # 各従業員データを処理
+                success_count = 0
+                for employee_key, employee_data in data.items():
+                    logger.debug(f"従業員 {employee_key} を処理中...")
+                    # ここで給与明細更新処理を実装
+                    # 検索ボタンクリック前のページ数を記録
+                    initial_pages = len(context.pages)
+                    logger.debug(f"検索ボタンクリック前のページ数: {initial_pages}")
+                    # ==========================
+                    # 検索ボタンをクリック
+                    try:
+                        search_button = page.locator(
+                            'input[type="button"].btn[value="検索"][onclick="Search()"]')
+                        if search_button.count() > 0:
+                            search_button.first.click()
+                            page.wait_for_timeout(1000)
+                            logger.debug("検索ボタンをクリックしました")
+                    except:
+                        pass
 
-                    page.once("dialog", recalc_dialog_handler)
+                    try:
+                        # 新しいページが開くまで待機
+                        page.wait_for_timeout(5000)
+                        # 新しく開いたページを取得
+                        current_pages = context.pages
+                        logger.debug(f"検索ボタンクリック後のページ数: {len(current_pages)}")
+                        if len(current_pages) > initial_pages:
+                            new_page = current_pages[-1]  # 最新のページを取得
+                            logger.debug(f"新しいページURL: {new_page.url}")
+                            try:
+                                new_page.wait_for_load_state(
+                                    "networkidle", timeout=10000)
+                                new_page.wait_for_timeout(3000)
 
-                    recalc_button = page.locator(
-                        'input[name="BtnRunCalcAll"][value="再計算"]')
-                    if recalc_button.count() > 0:
-                        recalc_button.first.click()
-                        logger.debug(f"再計算ボタンをクリックしました")
-                        page.wait_for_timeout(1000)  # ダイアログ処理待機
-                except Exception as e:
-                    logger.error(f"再計算ボタンエラー: {e}")
+                                # 従業員番号をテキストフィールドに入力
+                                try:
+                                    keyword_field = new_page.locator(
+                                        'input[type="text"].inpK[name="keywd"]')
+                                    if keyword_field.count() > 0:
+                                        keyword_field.first.fill(employee_key)
+                                        logger.debug(
+                                            f"従業員番号 {employee_key} を入力しました")
+                                        new_page.wait_for_timeout(1000)
+                                except Exception as input_error:
+                                    logger.debug(f"従業員番号入力エラー: {input_error}")
 
-                # 登録ボタンをクリック（ダイアログハンドラー付き）
-                try:
-                    # 一時的なダイアログハンドラーを設定
-                    def submit_dialog_handler(dialog):
-                        try:
-                            dialog.accept()
-                            logger.debug("登録確認ダイアログを受諾しました")
-                        except Exception as e:
-                            logger.error(f"登録ダイアログ処理エラー: {e}")
+                                # 検索ボタンをクリック
+                                try:
+                                    search_btn = new_page.locator(
+                                        'input[type="button"].btnS[onclick="SubmitFm()"][value="検索"]')
+                                    if search_btn.count() > 0:
+                                        search_btn.first.click()
+                                        logger.debug("検索ボタンをクリックしました")
+                                        new_page.wait_for_timeout(
+                                            2000)  # 検索結果の読み込みを待機
+                                except Exception as search_error:
+                                    logger.error(
+                                        f"検索ボタンクリックエラー: {search_error}")
 
-                    page.once("dialog", submit_dialog_handler)
+                                # 選択ボタンをクリック
+                                try:
+                                    select_btn = new_page.locator(
+                                        f'input[type="button"].btn[value="選択"][name="show_btn0"][onclick="Show(\'{employee_key}\')"]')
+                                    if select_btn.count() > 0:
+                                        logger.debug("選択前のスクリーンショットを撮影中...")
+                                        new_page.screenshot(
+                                            path="search_before_select.png")
 
-                    submit_button = page.locator(
-                        'input[name="BtnSubmit"][value="登録"]')
-                    if submit_button.count() > 0:
-                        submit_button.first.click()
-                        logger.debug(f"登録ボタンをクリックしました")
-                        page.wait_for_timeout(1000)  # ダイアログ処理待機
-                except Exception as e:
-                    logger.error(f"登録ボタンエラー: {e}")
+                                        select_btn.first.click()
+                                        logger.debug(
+                                            f"選択ボタン（{employee_key}）をクリックしました")
 
-                # ==========================
-                success_count += 1
+                                        # 選択ボタンクリック後はnew_pageが自動でcloseされるため
+                                        # メインのpageで待機
+                                        page.wait_for_timeout(2000)
+                                    else:
+                                        logger.error("選択ボタンが見つかりません")
+                                        new_page.close()
+                                except Exception as select_error:
+                                    logger.error(
+                                        f"選択ボタンクリックエラー: {select_error}")
+                                    # エラー時は手動でcloseを試行
+                                    try:
+                                        new_page.close()
+                                    except:
+                                        pass
+                            except Exception as screenshot_error:
+                                logger.error(
+                                    f"スクリーンショット撮影エラー: {screenshot_error}")
+                        else:
+                            logger.error("新しいページが検出されませんでした")
+                    except Exception as e:
+                        logger.error(f"検索ウィンドウ処理エラー: {e}")
+                        pass
 
-            # デバッグ用：ログイン後の画面をスクリーンショット
-            page.screenshot(path="login_debug.png")
-            logger.debug("ログイン後の画面をスクリーンショット保存: login_debug.png")
+                    # 選択後、メインページで編集ボタンをクリック
+                    page.wait_for_timeout(1000)  # 画面更新を待機
 
-            browser.close()
+                    # 編集ボタンをクリック
+                    try:
+                        edit_button = page.locator(
+                            'input[name="BtnEdit"][value="編集"]')
+                        if edit_button.count() > 0:
+                            logger.debug(f"編集ボタン（{employee_key}）をクリックしました")
+                            edit_button.first.click()
+                            page.wait_for_timeout(2000)  # 待機時間を延長
+                            # 編集画面の表示確認
+                            page.screenshot(
+                                path=f"edit_screen_{employee_key}.png")
+                            logger.debug(
+                                f"編集画面のスクリーンショットを保存: edit_screen_{employee_key}.png")
+                        else:
+                            logger.debug(f"編集ボタンが見つかりません（{employee_key}）")
+                    except Exception as e:
+                        logger.error(f"編集ボタンクリックエラー: {e}")
+
+                    # JSONデータから出勤日数と勤務時間を取得
+                    work_days_value = employee_data.get('出勤日数', '30')
+                    work_hours_value = employee_data.get('勤務時間', '240')
+
+                    # WorkDaysフィールドに値を入力
+                    try:
+                        work_days_field = page.locator(
+                            'input[name="WorkDays"]')
+                        if work_days_field.count() > 0:
+                            work_days_field.first.fill(work_days_value)
+                            logger.debug(
+                                f"WorkDaysフィールドに{work_days_value}を入力しました")
+                            page.wait_for_timeout(500)
+                    except Exception as e:
+                        logger.error(f"WorkDays入力エラー: {e}")
+
+                    # WorkHoursフィールドに時間を入力
+                    try:
+                        work_hours_field = page.locator(
+                            'input[name="WorkHours"]')
+                        if work_hours_field.count() > 0:
+                            work_hours_field.first.fill(work_hours_value)
+                            logger.debug(
+                                f"WorkHoursフィールドに{work_hours_value}を入力しました")
+                            page.wait_for_timeout(500)
+                    except Exception as e:
+                        logger.error(f"WorkHours入力エラー: {e}")
+
+                    # 再計算ボタンをクリック（ダイアログハンドラー付き）
+                    try:
+                        # 一時的なダイアログハンドラーを設定
+                        def recalc_dialog_handler(dialog):
+                            try:
+                                dialog.accept()
+                                logger.debug("再計算確認ダイアログを受諾しました")
+                            except Exception as e:
+                                logger.error(f"再計算ダイアログ処理エラー: {e}")
+
+                        page.once("dialog", recalc_dialog_handler)
+
+                        recalc_button = page.locator(
+                            'input[name="BtnRunCalcAll"][value="再計算"]')
+                        if recalc_button.count() > 0:
+                            recalc_button.first.click()
+                            logger.debug(f"再計算ボタンをクリックしました")
+                            page.wait_for_timeout(1000)  # ダイアログ処理待機
+                    except Exception as e:
+                        logger.error(f"再計算ボタンエラー: {e}")
+
+                    # 登録ボタンをクリック（ダイアログハンドラー付き）
+                    try:
+                        # 一時的なダイアログハンドラーを設定
+                        def submit_dialog_handler(dialog):
+                            try:
+                                dialog.accept()
+                                logger.debug("登録確認ダイアログを受諾しました")
+                            except Exception as e:
+                                logger.error(f"登録ダイアログ処理エラー: {e}")
+
+                        page.once("dialog", submit_dialog_handler)
+
+                        submit_button = page.locator(
+                            'input[name="BtnSubmit"][value="登録"]')
+                        if submit_button.count() > 0:
+                            submit_button.first.click()
+                            logger.debug(f"登録ボタンをクリックしました")
+                            page.wait_for_timeout(1000)  # ダイアログ処理待機
+                    except Exception as e:
+                        logger.error(f"登録ボタンエラー: {e}")
+
+                    # ==========================
+                    success_count += 1
+
+                # デバッグ用：ログイン後の画面をスクリーンショット
+                page.screenshot(path="login_debug.png")
+                logger.debug("ログイン後の画面をスクリーンショット保存: login_debug.png")
+
+                browser.close()
+        except Exception as e:
+            logger.error(f"Playwrightエラー: {e}")
+            return f"failed: Playwrightエラー - {str(e)}"
 
         client.stop()
         return f"success: {success_count}名の給与明細を処理しました"
