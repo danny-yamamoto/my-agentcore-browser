@@ -118,6 +118,13 @@ uv add google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-c
 ```
 
 ```bash
+rm -rf ~/.aws/credentials
+rm -rf ~/.aws/config
+
+aws configure sso
+```
+
+```bash
 uv run main.py 
 ```
 
